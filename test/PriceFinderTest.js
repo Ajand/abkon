@@ -16,6 +16,10 @@ describe("My Dapp", function () {
     abkoinSupply,
     governance,
     firstNftHolder,
+    bidder1,
+    bidder2,
+    bidder3,
+    bidder4,
     specialist1,
     specialist2,
     specialist3,
@@ -238,13 +242,10 @@ describe("My Dapp", function () {
 
     it("Must be able to accept an offer after delay", async function () {
       const requestId = 1;
-
       const expectedAuctionId = 0;
-
       await expect(
         priceFinder.connect(specialist1).acceptOffer(requestId)
       ).to.be.revertedWith("not owner");
-
       await expect(
         priceFinder.connect(firstNftHolder).acceptOffer(requestId)
       ).to.be.revertedWith("must wait");
@@ -253,7 +254,6 @@ describe("My Dapp", function () {
       await network.provider.send("evm_mine");
 
       const assetOffer = await priceFinder.calculateAssetOffer(requestId);
-
       await expect(priceFinder.connect(firstNftHolder).acceptOffer(requestId))
         .to.emit(priceFinder, "AcceptOffer")
         .withArgs(requestId)
@@ -261,14 +261,10 @@ describe("My Dapp", function () {
         .withArgs(requestId, expectedAuctionId, assetOffer);
 
       const holderBalance = await abKoin.balanceOf(firstNftHolder.address);
-
       const expectedBalance = 380;
       const expectedStatus = 2;
-
       expect(String(holderBalance)).to.equal(String(expectedBalance));
-
       const request = await priceFinder.getRequest(requestId);
-
       expect(request.status).to.equal(expectedStatus);
 
       const rewards = await priceFinder.calculateSpecialistsRewards(requestId);
@@ -291,6 +287,107 @@ describe("My Dapp", function () {
       );
       expect(String(firstAuction.highestBid)).to.equal(String(0));
       expect(firstAuction.status).to.equal(0);
+    });
+
+    it("Let's bid on the english auction", async function () {
+      const auctionId = 0;
+      bidder1 = signers[15];
+      bidder2 = signers[16];
+      const bidderBalance = 10000;
+
+      const bidAllowance = 2000;
+
+      await abKoin.connect(governance).transfer(bidder1.address, bidderBalance);
+      await abKoin.connect(bidder1).approve(auctionHouse.address, bidAllowance);
+
+      await abKoin.connect(governance).transfer(bidder2.address, bidderBalance);
+      await abKoin.connect(bidder2).approve(auctionHouse.address, bidAllowance);
+
+      const wrongBid = 400;
+      const correctBid = 500;
+      const correctBid2 = 501;
+
+      await expect(
+        auctionHouse.connect(bidder1).bidEnglishAuction(auctionId, wrongBid)
+      ).to.be.revertedWith("not enough");
+
+      await expect(
+        auctionHouse.connect(bidder1).bidEnglishAuction(auctionId, correctBid)
+      )
+        .to.emit(auctionHouse, "EnglishAuctionItemBidded")
+        .withArgs(auctionId, correctBid);
+
+      await expect(
+        auctionHouse.connect(bidder1).bidEnglishAuction(auctionId, correctBid2)
+      ).to.be.revertedWith("already high bidder");
+
+      await expect(
+        auctionHouse.connect(bidder2).bidEnglishAuction(auctionId, correctBid)
+      ).to.be.revertedWith("not enough");
+
+      expect(String(await abKoin.balanceOf(bidder1.address))).to.be.equal(
+        String(bidderBalance - correctBid)
+      );
+
+      await expect(
+        auctionHouse.connect(bidder2).bidEnglishAuction(auctionId, correctBid2)
+      )
+        .to.emit(auctionHouse, "EnglishAuctionItemBidded")
+        .withArgs(auctionId, correctBid2);
+
+      const firstAuction = await auctionHouse.getEnglishAuction(auctionId);
+
+      expect(String(firstAuction.highestBidder)).to.equal(
+        String(bidder2.address)
+      );
+      expect(String(firstAuction.highestBid)).to.equal(String(correctBid2));
+      expect(firstAuction.status).to.equal(2);
+
+      expect(String(await abKoin.balanceOf(bidder2.address))).to.be.equal(
+        String(bidderBalance - correctBid2)
+      );
+      expect(String(await abKoin.balanceOf(bidder1.address))).to.be.equal(
+        String(bidderBalance)
+      );
+    });
+
+    it("Let's finish the english auction", async function () {
+      const auctionId = 0;
+      const tokenId = 1;
+      const requestId = 1;
+      const firstAuction = await auctionHouse.getEnglishAuction(auctionId);
+
+      await expect(
+        auctionHouse.connect(bidder2).endEnglishAuction(auctionId)
+      ).to.be.revertedWith("can't yet");
+
+      /// let's mine some minutes
+
+      await network.provider.send("evm_increaseTime", [600]);
+      await network.provider.send("evm_mine");
+
+      expect(String(await fakeApe.ownerOf(tokenId))).to.equal(
+        String(priceFinder.address)
+      );
+
+      expect(await abKoin.totalSupply()).to.equal(String(abkoinSupply + 400));
+
+      await expect(auctionHouse.connect(bidder2).endAllEndedAuctions())
+        .to.emit(auctionHouse, "EnglishAuctionEnded")
+        .withArgs(auctionId, firstAuction.highestBid);
+
+      const endedAuction = await auctionHouse.getEnglishAuction(auctionId);
+      expect(endedAuction.status).to.equal(1);
+
+      expect(String(await fakeApe.ownerOf(tokenId))).to.equal(
+        String(bidder2.address)
+      );
+
+      expect(await abKoin.totalSupply()).to.equal(String(abkoinSupply - 101));
+
+      expect(
+        (await priceFinder.getSpecialist(specialist1.address)).reputation
+      ).to.be.equal(String(11240));
     });
   });
 });

@@ -186,8 +186,6 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
         emit DeStakeSpecialist(msg.sender, amount);
     }
 
-    // Stake * reputation means the weight
-
     function getSpecialistFreeWeight(address _specialist)
         public
         view
@@ -232,17 +230,67 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
         return requestOffers[_requestId];
     }
 
-    /// Internal contract methods
-    function adjustSpecialist() private {
-        /// Adjust Specialist repuation
-        /// If it was going less than 1 handle stake
-        /// This will be used and only used by auction house after selling the NFT
+    /// Only Auction house will be able to do this
+    function finalizeRequest(
+        uint256 _requestId,
+        uint256 _finalPrice,
+        address _buyer
+    ) public {
+        require(msg.sender == address(auctionHouse), "only auctionhouse");
+        Request memory request = requests[_requestId];
+        IERC721 collection = IERC721(request.collection);
+        collection.transferFrom(address(this), _buyer, request.tokenId);
+        adjustSpecialist(_requestId, _finalPrice);
     }
 
-    function penalizeStake(uint256 _amount) private {
-        /// See the ratio,
-        /// Either burn or send to treasury
-        /// only called by adjustSpecialist
+    /// Internal contract methods
+    function adjustSpecialist(uint256 _requestId, uint256 _finalPrice) private {
+        // TODO this function needs heavy auditing
+
+        Offer[] memory offers = requestOffers[_requestId];
+        uint256 assetOffer = calculateAssetOffer(_requestId);
+        bool profitable = _finalPrice > assetOffer ? true : false;
+        uint256 profit = profitable
+            ? _finalPrice - assetOffer
+            : assetOffer - _finalPrice;
+
+        uint256 shareSum = offers.length * profit;
+        uint256 burnsNeeded = 0;
+
+        for (uint256 i = 0; i < offers.length; i++) {
+            Specialist storage specialist = specialists[offers[i].specialist];
+            //offers[i].value
+            bool postivieImpact = _finalPrice > offers[i].value;
+            uint256 priceDifference = postivieImpact
+                ? _finalPrice - offers[i].value
+                : offers[i].value - _finalPrice;
+            uint256 specialistImpact = (profit *
+                priceDifference *
+                REPUTATION_MUL) / shareSum;
+            uint256 currWeight = specialist.reputation * specialist.stakes;
+            if (true) {
+                specialist.reputation =
+                    (currWeight + specialistImpact) /
+                    specialist.stakes;
+            } else {
+                uint256 minReputationWeight = 1 *
+                    REPUTATION_MUL *
+                    specialist.stakes;
+                if (currWeight - specialistImpact > minReputationWeight) {
+                    specialist.reputation = 0;
+                    (currWeight + specialistImpact) / specialist.stakes;
+                } else {
+                    specialist.reputation = 1 * REPUTATION_MUL;
+                    uint256 endStake = (currWeight - specialistImpact) /
+                        REPUTATION_MUL;
+                    burnsNeeded += specialist.stakes - endStake;
+                    specialist.stakes = endStake;
+                }
+            }
+            if (burnsNeeded > 0) {
+                ABK.burn(burnsNeeded);
+            }
+        }
     }
 
     function calculateAssetOffer(uint256 _requestId)
