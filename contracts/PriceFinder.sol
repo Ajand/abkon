@@ -2,6 +2,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./ABKoin.sol";
+import "./AuctionHouse.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -69,11 +70,16 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
     mapping(address => Specialist) public specialists;
 
     ABKoin public ABK;
+    AuctionHouse public auctionHouse;
 
     constructor() {}
 
-    function initialize(address _ABKAddress) public initializer {
+    function initialize(address _ABKAddress, address _auctionHouseAddress)
+        public
+        initializer
+    {
         ABK = ABKoin(_ABKAddress);
+        auctionHouse = AuctionHouse(_auctionHouseAddress);
     }
 
     // Seller Methods
@@ -142,6 +148,7 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
         request.status = RequestStatus.ACCPETED;
         handleSpecialistFee(_requestId);
         /// Send NFT to the Auction House
+        auctionHouse.startEnglishAuction(_requestId, offerPrice);
         emit AcceptOffer(_requestId);
     }
 

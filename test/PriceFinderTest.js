@@ -9,6 +9,7 @@ describe("My Dapp", function () {
     FakeApe,
     ABKoin,
     priceFinder,
+    auctionHouse,
     fakeApe,
     abKoin,
     signers,
@@ -36,14 +37,18 @@ describe("My Dapp", function () {
 
       ABKoin = await ethers.getContractFactory("ABKoin");
       PriceFinder = await ethers.getContractFactory("PriceFinder");
+      AuctionHouse = await ethers.getContractFactory("AuctionHouse");
+
       FakeApe = await ethers.getContractFactory("FakeApe");
 
       abKoin = await ABKoin.deploy();
       priceFinder = await PriceFinder.deploy();
       fakeApe = await FakeApe.deploy();
+      auctionHouse = await AuctionHouse.deploy();
 
       abKoin.initialize(abkoinSupply, governance.address, priceFinder.address);
-      priceFinder.initialize(abKoin.address);
+      priceFinder.initialize(abKoin.address, auctionHouse.address);
+      auctionHouse.initialize(abKoin.address, priceFinder.address);
     });
 
     it("Should be able to make the first NFT Request", async function () {
@@ -234,6 +239,8 @@ describe("My Dapp", function () {
     it("Must be able to accept an offer after delay", async function () {
       const requestId = 1;
 
+      const expectedAuctionId = 0;
+
       await expect(
         priceFinder.connect(specialist1).acceptOffer(requestId)
       ).to.be.revertedWith("not owner");
@@ -245,9 +252,13 @@ describe("My Dapp", function () {
       await network.provider.send("evm_increaseTime", [2 * 60]);
       await network.provider.send("evm_mine");
 
+      const assetOffer = await priceFinder.calculateAssetOffer(requestId);
+
       await expect(priceFinder.connect(firstNftHolder).acceptOffer(requestId))
         .to.emit(priceFinder, "AcceptOffer")
-        .withArgs(requestId);
+        .withArgs(requestId)
+        .to.emit(auctionHouse, "EnglishAuctionItemCreated")
+        .withArgs(requestId, expectedAuctionId, assetOffer);
 
       const holderBalance = await abKoin.balanceOf(firstNftHolder.address);
 
@@ -266,6 +277,20 @@ describe("My Dapp", function () {
 
       expect(String(rewards[0].amount)).to.equal(String(expectedReward));
       expect(String(rewards[1].amount)).to.equal(String(expectedReward));
+
+      const firstAuction = await auctionHouse.getEnglishAuction(
+        expectedAuctionId
+      );
+
+      expect((await auctionHouse.getEnglishAuctions()).length).to.equal(1);
+
+      expect(String(firstAuction.requestId)).to.equal(String(requestId));
+      expect(String(firstAuction.startingBid)).to.equal(String(assetOffer));
+      expect(String(firstAuction.highestBidder)).to.equal(
+        String("0x0000000000000000000000000000000000000000")
+      );
+      expect(String(firstAuction.highestBid)).to.equal(String(0));
+      expect(firstAuction.status).to.equal(0);
     });
   });
 });
