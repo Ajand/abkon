@@ -13,16 +13,14 @@ import useConnection from "./web3/useConnection";
 const Router = () => {
   const connection = useConnection();
 
-  console.log(connection.account, connection.RPC_URL);
-
   return (
     <div>
       <Header connection={connection} />
       <div>
         <Routes>
-          <Route path="/" element={<Auction />} />
+          <Route path="/" element={<Auction connection={connection} />} />
           <Route path="panel" element={<Specialist />} />
-          <Route path="abkoin" element={<ABKoin />} />
+          <Route path="abkoin" element={<ABKoin connection={connection} />} />
           <Route path="nfts" element={<NFTS />} />
         </Routes>
       </div>

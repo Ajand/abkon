@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
+import { ethers } from "ethers";
 
 const useConnection = () => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [account, setAccount] = useState("");
+  const selectedAddress = window?.ethereum?.selectedAddress;
+  const [isConnected, setIsConnected] = useState(
+    selectedAddress ? selectedAddress : false
+  );
+  const [account, setAccount] = useState(
+    selectedAddress ? selectedAddress : ""
+  );
 
   const RPC_URL = "http://localhost:8545";
 
   const connect = async () => {
     const desiredChain = "0x539"; //"0x4";
-    console.log(window.ethereum);
     if (typeof window.ethereum === "undefined") {
       throw new Error("Metamask does not exists");
     }
@@ -24,11 +29,19 @@ const useConnection = () => {
     //});
   };
 
+  const provider = account
+    ? new ethers.providers.Web3Provider(window.ethereum)
+    : new ethers.providers.JsonRpcProvider(RPC_URL);
+
+  const signer = provider.getSigner();
+
   return {
     isConnected,
     connect,
     RPC_URL,
     account,
+    provider,
+    signer,
   };
 };
 
