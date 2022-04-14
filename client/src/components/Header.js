@@ -6,6 +6,8 @@ import {
   Toolbar,
 } from "@material-ui/core";
 import { useNavigate } from "react-router-dom";
+import useConnection from "../web3/useConnection";
+import withError from "./withError";
 
 const useStyles = makeStyles((theme) => ({
   root: {},
@@ -18,10 +20,8 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const Header = () => {
+const Header = ({ alertError, connection }) => {
   const classes = useStyles();
-
-  const connected = true;
 
   const navigate = useNavigate();
 
@@ -31,7 +31,7 @@ const Header = () => {
         <Typography variant="h6" className={classes.title}>
           ABKON
         </Typography>
-        {connected ? (
+        {connection.isConnected ? (
           <>
             <Button
               onClick={() => navigate("/abkoin")}
@@ -60,7 +60,21 @@ const Header = () => {
           </>
         ) : (
           <>
-            <Button color="secondary">Connect</Button>
+            <Button
+              onClick={() =>
+                connection
+                  .connect()
+                  .then(() => {
+                    console.log("Handle the connection from here");
+                  })
+                  .catch((err) => {
+                    alertError(err.message);
+                  })
+              }
+              color="secondary"
+            >
+              Connect
+            </Button>
           </>
         )}
       </Toolbar>
@@ -68,4 +82,4 @@ const Header = () => {
   );
 };
 
-export default Header;
+export default withError(Header);

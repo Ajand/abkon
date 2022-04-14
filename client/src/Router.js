@@ -8,10 +8,16 @@ import NFTS from "./pages/NFTS";
 import Auction from "./pages/Auction";
 import Specialist from "./pages/Specialist";
 
+import useConnection from "./web3/useConnection";
+
 const Router = () => {
+  const connection = useConnection();
+
+  console.log(connection.account, connection.RPC_URL);
+
   return (
     <div>
-      <Header />
+      <Header connection={connection} />
       <div>
         <Routes>
           <Route path="/" element={<Auction />} />
