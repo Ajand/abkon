@@ -21,7 +21,7 @@ const Router = () => {
           <Route path="/" element={<Auction connection={connection} />} />
           <Route path="panel" element={<Specialist />} />
           <Route path="abkoin" element={<ABKoin connection={connection} />} />
-          <Route path="nfts" element={<NFTS />} />
+          <Route path="nfts" element={<NFTS connection={connection} />} />
         </Routes>
       </div>
     </div>

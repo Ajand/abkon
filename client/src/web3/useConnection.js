@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 
 const useConnection = () => {
-  const selectedAddress = window?.ethereum?.selectedAddress;
-  const [isConnected, setIsConnected] = useState(
-    selectedAddress ? selectedAddress : false
-  );
-  const [account, setAccount] = useState(
-    selectedAddress ? selectedAddress : ""
-  );
+  const [isConnected, setIsConnected] = useState(false);
+  const [account, setAccount] = useState("");
+
+  setTimeout(() => {
+    setIsConnected(window?.ethereum?.selectedAddress ? true : false);
+    setAccount(
+      window?.ethereum?.selectedAddress ? window?.ethereum?.selectedAddress : ""
+    );
+  }, 500);
 
   const RPC_URL = "http://localhost:8545";
 

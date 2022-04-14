@@ -54,6 +54,15 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
         uint256 createdAt;
     }
 
+    struct RequestWithOffer {
+        address applicant;
+        address collection;
+        uint256 tokenId;
+        RequestStatus status;
+        uint256 createdAt;
+        uint256 offer;
+    }
+
     struct Specialist {
         uint256 reputation;
         uint256 stakes;
@@ -90,6 +99,23 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
         returns (Request memory)
     {
         return requests[_requestId];
+    }
+
+    function getRequests() public view returns (RequestWithOffer[] memory) {
+        RequestWithOffer[] memory reqs = new RequestWithOffer[](
+            requests.length
+        );
+        for (uint256 i = 0; i < requests.length; i++) {
+            reqs[i] = RequestWithOffer(
+                requests[i].applicant,
+                requests[i].collection,
+                requests[i].tokenId,
+                requests[i].status,
+                requests[i].createdAt,
+                calculateAssetOffer(i)
+            );
+        }
+        return reqs;
     }
 
     function getRequestsLength() public view returns (uint256) {
