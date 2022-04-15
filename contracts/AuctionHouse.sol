@@ -12,9 +12,10 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 /// a dutch auction
 contract AuctionHouse is Initializable, ReentrancyGuardUpgradeable {
     /// ===== Constants ====
-    uint256 public constant DURATION = 10 minutes;
+    uint256 public constant DURATION = 2 minutes;
     uint256 public constant ADD_TIME = 1 minutes;
     uint256 public constant MIN_PRICE = 0;
+    uint256 public constant DISCOUNT_RATE = 5;
 
     ABKoin public ABK;
     PriceFinder public priceFinder;
@@ -195,19 +196,13 @@ contract AuctionHouse is Initializable, ReentrancyGuardUpgradeable {
     event DutchAuctionItemBought(uint256 indexed auctionId, uint256 price);
 
     // get price
-    function getDutchPrice(uint256 auctionId) public view returns (uint256) {
-        DutchAuctionItem memory auction = dutchAuctions[auctionId];
-        uint256 dp = auction.initialPrice - MIN_PRICE;
-        uint256 ct = block.timestamp - auction.startAt;
-        uint256 nominator = (ct * 1000) / DURATION;
-
+    function getDutchPrice(uint256 _auctionId) public view returns (uint256) {
         unchecked {
-            require(dp > 0, "Initial price must be larger than min price");
-            require(ct >= 0, "auction must be started");
-            if (ct > DURATION) {
-                return MIN_PRICE;
-            }
-            return auction.initialPrice - ((dp * (nominator)) / 1000);
+            DutchAuctionItem memory auction = dutchAuctions[_auctionId];
+            return
+                auction.initialPrice + auction.startAt - block.timestamp > 0
+                    ? auction.initialPrice + auction.startAt - block.timestamp
+                    : 0;
         }
     }
 

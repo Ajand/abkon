@@ -4,11 +4,14 @@ import {
   Divider,
   Button,
   Typography,
+  IconButton,
 } from "@material-ui/core";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { SpinnerDiamond } from "spinners-react";
 import moment from "moment";
+import { useTimer } from "react-timer-hook";
+import { AddCircle } from "@material-ui/icons";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -45,8 +48,45 @@ const NFTCard = ({
   onDropRequest,
   onAcceptRequest,
   request,
+  auction,
+  onEndEngAuction,
+  getCurrentPrice,
+  bidEngAuction,
+  onIncreaseApproval,
+  buyDutchAuction,
 }) => {
   const classes = useStyles();
+
+  const [currentPrice, setCurrentPrice] = useState(0);
+
+  useEffect(() => {
+    const main = async () => {
+      if (getCurrentPrice) {
+        setCurrentPrice(await getCurrentPrice());
+        setInterval(async () => {
+          setCurrentPrice(await getCurrentPrice());
+        }, 5 * 1000);
+      }
+    };
+    main();
+  }, []);
+
+  const {
+    seconds,
+    minutes,
+    hours,
+    days,
+    isRunning,
+    start,
+    pause,
+    resume,
+    restart,
+  } = useTimer({
+    expiryTimestamp: auction?.endAt
+      ? new Date(parseInt(String(auction.endAt)) * 1000)
+      : new Date(),
+    onExpire: () => console.warn("onExpire called"),
+  });
 
   const [nftInfo, setNFTInfo] = useState(null);
 
@@ -75,8 +115,16 @@ const NFTCard = ({
           <>
             <div className={classes.section}>
               <div className={classes.actionRow}>
-                <Typography variant="body1">Dutch Auction</Typography>
-                <Typography variant="body2">5:00</Typography>
+                <Typography variant="body1">
+                  Dutch Auction{" "}
+                  <IconButton
+                    onClick={onIncreaseApproval}
+                    size="small"
+                    color="primary"
+                  >
+                    <AddCircle />
+                  </IconButton>
+                </Typography>
               </div>
             </div>
             <Divider />
@@ -87,10 +135,15 @@ const NFTCard = ({
                     Current Price:
                   </Typography>
                   <Typography variant="body2" className={classes.priceAmount}>
-                    300 ABK
+                    {String(currentPrice)} ABK$
                   </Typography>
                 </div>
-                <Button size="small" variant="text" color="primary">
+                <Button
+                  onClick={buyDutchAuction}
+                  size="small"
+                  variant="text"
+                  color="primary"
+                >
                   Buy
                 </Button>
               </div>
@@ -102,8 +155,34 @@ const NFTCard = ({
           <>
             <div className={classes.section}>
               <div className={classes.actionRow}>
-                <Typography variant="body1">English Auction</Typography>
-                <Typography variant="body2">5:00</Typography>
+                <Typography variant="body1">
+                  English Auction{" "}
+                  <IconButton
+                    onClick={onIncreaseApproval}
+                    size="small"
+                    color="primary"
+                  >
+                    <AddCircle />
+                  </IconButton>
+                </Typography>
+                <Typography variant="body2">
+                  {isRunning ? (
+                    <>
+                      {minutes}:{seconds}
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="contained"
+                        color="secondary"
+                        size="small"
+                        onClick={onEndEngAuction}
+                      >
+                        End
+                      </Button>
+                    </>
+                  )}
+                </Typography>
               </div>
             </div>
             <Divider />
@@ -114,10 +193,18 @@ const NFTCard = ({
                     Highest Bid:
                   </Typography>
                   <Typography variant="body2" className={classes.priceAmount}>
-                    {request.offer} ABK
+                    {auction.status === 0
+                      ? String(auction.startingBid)
+                      : String(auction.highestBid)}{" "}
+                    ABK
                   </Typography>
                 </div>
-                <Button size="small" variant="text" color="primary">
+                <Button
+                  onClick={bidEngAuction}
+                  size="small"
+                  variant="text"
+                  color="primary"
+                >
                   Bid
                 </Button>
               </div>

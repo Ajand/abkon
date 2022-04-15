@@ -316,6 +316,7 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
                 ABK.burn(burnsNeeded);
             }
         }
+        freeLockedStake(_requestId);
     }
 
     function calculateAssetOffer(uint256 _requestId)
