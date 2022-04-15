@@ -8,9 +8,7 @@ import { ethers } from "ethers";
 import contractsAddress from "../contractsAddress";
 import { SpinnerDiamond } from "spinners-react";
 
-// must be able to request for price nfts - approval
 // must be able to accept offer
-// must be able to cancel request
 
 const useStyles = makeStyles((theme) => ({
   root: {},
@@ -48,8 +46,6 @@ const NFTS = ({ connection }) => {
     PriceFinder.abi,
     connection.signer
   );
-
-  console.log(myRequests);
 
   const mainDataFetching = async () => {
     if (connection.account) {
@@ -235,8 +231,6 @@ const NFTS = ({ connection }) => {
               request={request}
               variant="requested"
               onDropRequest={async () => {
-                console.log(request);
-
                 const tx = await priceFinder.dropRequest(request.id);
                 const isTransactionMined = async (transactionHash) => {
                   const txReceipt =
@@ -257,7 +251,27 @@ const NFTS = ({ connection }) => {
                   }
                 }, 2000);
               }}
-              onAcceptRequest={() => {}}
+              onAcceptRequest={async () => {
+                const tx = await priceFinder.acceptOffer(request.id);
+                const isTransactionMined = async (transactionHash) => {
+                  const txReceipt =
+                    await connection.provider.getTransactionReceipt(
+                      transactionHash
+                    );
+                  if (txReceipt && txReceipt.blockNumber) {
+                    return txReceipt;
+                  }
+                };
+
+                const a = setInterval(() => {
+                  if (isTransactionMined(tx.hash)) {
+                    setTimeout(() => {
+                      mainDataFetching();
+                    }, 3 * 1000);
+                    clearInterval(a);
+                  }
+                }, 2000);
+              }}
             />
           </Col>
         ))}

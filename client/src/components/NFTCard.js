@@ -43,6 +43,7 @@ const NFTCard = ({
   fakeApe,
   onRequestForPrice,
   onDropRequest,
+  onAcceptRequest,
   request,
 }) => {
   const classes = useStyles();
@@ -148,10 +149,15 @@ const NFTCard = ({
                   }
                   color="primary"
                   variant="contained"
+                  onClick={onAcceptRequest}
                 >
                   Accept
                 </Button>
-                <Button onClick={onDropRequest} color="secondary" variant="contained">
+                <Button
+                  onClick={onDropRequest}
+                  color="secondary"
+                  variant="contained"
+                >
                   Drop
                 </Button>
               </div>

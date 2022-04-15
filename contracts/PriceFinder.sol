@@ -197,8 +197,7 @@ contract PriceFinder is Initializable, ReentrancyGuardUpgradeable {
             uint256 currWeight = specialist.reputation * specialist.stakes;
             specialist.reputation =
                 (currWeight + amount * REPUTATION_MUL) /
-                specialist.stakes +
-                amount;
+                (specialist.stakes + amount);
         }
         specialist.stakes = specialist.stakes + amount;
         emit StakeSpecialist(msg.sender, amount);

@@ -19,7 +19,10 @@ const Router = () => {
       <div>
         <Routes>
           <Route path="/" element={<Auction connection={connection} />} />
-          <Route path="panel" element={<Specialist />} />
+          <Route
+            path="panel"
+            element={<Specialist connection={connection} />}
+          />
           <Route path="abkoin" element={<ABKoin connection={connection} />} />
           <Route path="nfts" element={<NFTS connection={connection} />} />
         </Routes>

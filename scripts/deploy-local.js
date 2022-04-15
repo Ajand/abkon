@@ -24,11 +24,15 @@ async function main() {
   fakeApe = await FakeApe.deploy();
   auctionHouse = await AuctionHouse.deploy();
 
-  console.log(abKoin.address)
+  console.log(abKoin.address);
 
-  abKoin.initialize(abkoinSupply, governance.address, priceFinder.address);
-  priceFinder.initialize(abKoin.address, auctionHouse.address);
-  auctionHouse.initialize(abKoin.address, priceFinder.address);
+  await abKoin.initialize(
+    abkoinSupply,
+    governance.address,
+    priceFinder.address
+  );
+  await priceFinder.initialize(abKoin.address, auctionHouse.address);
+  await auctionHouse.initialize(abKoin.address, priceFinder.address);
 
   console.log("ABKoin Address: ", abKoin.address);
   console.log("Price Finder Address: ", priceFinder.address);

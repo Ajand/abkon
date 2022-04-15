@@ -9,8 +9,18 @@ import {
   TableHead,
   TableRow,
   TextField,
+  IconButton,
 } from "@material-ui/core";
+import { AddCircle } from "@material-ui/icons";
 import { Row, Col, Container } from "react-grid-system";
+import { useEffect, useState } from "react";
+import FakeApe from "../web3/abis/FakeApe.json";
+import PriceFinder from "../web3/abis/PriceFinder.json";
+import ABKoin from "../web3/abis/ABKoin.json";
+
+import { ethers } from "ethers";
+import contractsAddress from "../contractsAddress";
+import { SpinnerDiamond } from "spinners-react";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -21,82 +31,247 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     justifyContent: "space-between",
     marginBottom: "0.5em",
+    alignItems: "center",
+  },
+  loadingContainer: {
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
+    height: 300,
   },
 }));
 
-function createData(name, calories, fat, carbs, protein) {
-  return { name, calories, fat, carbs, protein };
-}
-
-const rows = [
-  createData("1", 159, 6.0, 24, 4.0),
-  createData("2", 237, 9.0, 37, 4.3),
-  createData("3", 262, 16.0, 24, 6.0),
-  createData("4", 305, 3.7, 67, 4.3),
-  createData("5", 356, 16.0, 49, 3.9),
-];
-
-const Specialist = () => {
+const Specialist = ({ connection }) => {
   const classes = useStyles();
+
+  const [myRequests, setMyRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [suggestPrice, setSuggestPrice] = useState(new Map());
+
+  const [yourBalance, setBalance] = useState(0);
+  const [yourAllowance, setAllowance] = useState(0);
+  const [specialist, setSpecialist] = useState({
+    reputation: 0,
+    stakes: 0,
+    lockedWeight: 0,
+  });
+  const [maxDestakeAllowed, setMDA] = useState(0);
+
+  const abKoin = new ethers.Contract(
+    contractsAddress.abkoin,
+    ABKoin.abi,
+    connection.signer
+  );
+
+  const priceFinder = new ethers.Contract(
+    contractsAddress.priceFinder,
+    PriceFinder.abi,
+    connection.signer
+  );
+
+  const mainDataFetching = async () => {
+    if (connection.account) {
+      const balance = connection.account
+        ? await abKoin.balanceOf(connection.account)
+        : 0;
+
+      const allowance = connection.account
+        ? await abKoin.allowance(connection.account, priceFinder.address)
+        : 0;
+
+      setBalance(String(balance));
+      setAllowance(String(allowance));
+
+      const requests = await priceFinder.getRequests();
+
+      setMyRequests(
+        requests
+          .map((req, i) => ({ ...req, id: i }))
+          .filter((req) => req.status === 0)
+      );
+
+      setSpecialist(await priceFinder.getSpecialist(connection.account));
+      setMDA(await priceFinder.calculateMaxDestaking(connection.account));
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    mainDataFetching();
+  }, [connection.account]);
 
   return (
     <Container className={classes.root}>
       <Row>
         <Col md={4}>
           <Paper square>
-            <div className={classes.section}>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>Your Balance</div>
-                <div className={classes.informationTitle}>30000 $ABK</div>
-              </div>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>Your Approval</div>
-                <div className={classes.informationTitle}>3000 $ABK</div>
-              </div>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>Stakes</div>
-                <div className={classes.informationTitle}>4000 $ABK</div>
-              </div>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>Locked Weight</div>
-                <div className={classes.informationTitle}>2500</div>
-              </div>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>Reputation</div>
-                <div className={classes.informationTitle}>1.5478</div>
-              </div>
-              <div className={classes.informationRow}>
-                <div className={classes.informationTitle}>
-                  Max Destake Allowed
+            {loading ? (
+              <>
+                <div className={classes.loadingContainer}>
+                  <SpinnerDiamond
+                    size={73}
+                    thickness={180}
+                    speed={152}
+                    color="rgba(77, 119, 255, 1)"
+                    secondaryColor="rgba(242, 250, 90, 1)"
+                  />
                 </div>
-                <div className={classes.informationTitle}>400 $ABK</div>
-              </div>
-            </div>
-            <Divider />
-            <div className={classes.section}>
-              <Row>
-                <Col sm={6}>
-                  <Button
-                    fullWidth
-                    size="small"
-                    variant="contained"
-                    color="primary"
-                  >
-                    Stake
-                  </Button>
-                </Col>
-                <Col sm={6}>
-                  <Button
-                    fullWidth
-                    size="small"
-                    variant="outlined"
-                    color="primary"
-                  >
-                    De Stake
-                  </Button>
-                </Col>
-              </Row>
-            </div>
+              </>
+            ) : (
+              <>
+                <div className={classes.section}>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>Your Balance</div>
+                    <div className={classes.informationTitle}>
+                      {String(yourBalance)} $ABK
+                    </div>
+                  </div>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>
+                      Your Approval
+                    </div>
+                    <div className={classes.informationTitle}>
+                      <IconButton
+                        size="small"
+                        onClick={async () => {
+                          const tx = await abKoin.approve(
+                            priceFinder.address,
+                            yourBalance
+                          );
+                          const isTransactionMined = async (
+                            transactionHash
+                          ) => {
+                            const txReceipt =
+                              await connection.provider.getTransactionReceipt(
+                                transactionHash
+                              );
+                            if (txReceipt && txReceipt.blockNumber) {
+                              return txReceipt;
+                            }
+                          };
+
+                          const a = setInterval(() => {
+                            if (isTransactionMined(tx.hash)) {
+                              setTimeout(() => {
+                                mainDataFetching();
+                              }, 3 * 1000);
+                              clearInterval(a);
+                            }
+                          }, 2000);
+                        }}
+                      >
+                        <AddCircle color="primary" />
+                      </IconButton>{" "}
+                      {String(yourAllowance)} $ABK
+                    </div>
+                  </div>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>Stakes</div>
+                    <div className={classes.informationTitle}>
+                      {String(specialist.stakes)} $ABK
+                    </div>
+                  </div>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>
+                      Locked Weight
+                    </div>
+                    <div className={classes.informationTitle}>
+                      {String(specialist.lockedWeight)}
+                    </div>
+                  </div>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>Reputation</div>
+                    <div className={classes.informationTitle}>
+                      {String(specialist.reputation)}
+                    </div>
+                  </div>
+                  <div className={classes.informationRow}>
+                    <div className={classes.informationTitle}>
+                      Max Destake Allowed
+                    </div>
+                    <div className={classes.informationTitle}>
+                      {" "}
+                      {String(maxDestakeAllowed)} $ABK
+                    </div>
+                  </div>
+                </div>
+                <Divider />
+                <div className={classes.section}>
+                  <Row>
+                    <Col sm={6}>
+                      <Button
+                        fullWidth
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={async () => {
+                          const tx = await priceFinder.stakeABK(yourAllowance);
+                          const isTransactionMined = async (
+                            transactionHash
+                          ) => {
+                            const txReceipt =
+                              await connection.provider.getTransactionReceipt(
+                                transactionHash
+                              );
+                            if (txReceipt && txReceipt.blockNumber) {
+                              return txReceipt;
+                            }
+                          };
+
+                          const a = setInterval(() => {
+                            if (isTransactionMined(tx.hash)) {
+                              setTimeout(() => {
+                                mainDataFetching();
+                              }, 3 * 1000);
+                              clearInterval(a);
+                            }
+                          }, 2000);
+                        }}
+                      >
+                        Stake
+                      </Button>
+                    </Col>
+                    <Col sm={6}>
+                      <Button
+                        fullWidth
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                        onClick={async () => {
+                          const tx = await priceFinder.destakeABK(
+                            maxDestakeAllowed
+                          );
+                          const isTransactionMined = async (
+                            transactionHash
+                          ) => {
+                            const txReceipt =
+                              await connection.provider.getTransactionReceipt(
+                                transactionHash
+                              );
+                            if (txReceipt && txReceipt.blockNumber) {
+                              return txReceipt;
+                            }
+                          };
+
+                          const a = setInterval(() => {
+                            if (isTransactionMined(tx.hash)) {
+                              setTimeout(() => {
+                                mainDataFetching();
+                              }, 3 * 1000);
+                              clearInterval(a);
+                            }
+                          }, 2000);
+                        }}
+                      >
+                        De Stake
+                      </Button>
+                    </Col>
+                  </Row>
+                </div>
+              </>
+            )}
           </Paper>
         </Col>
         <Col md={8}>
@@ -111,21 +286,66 @@ const Specialist = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.name}>
+                {myRequests.map((request) => (
+                  <TableRow key={String(request.id)}>
                     <TableCell component="th" scope="row">
-                      {row.name}
+                      {String(request.id)}
                     </TableCell>
-                    <TableCell>{row.calories}</TableCell>
+                    <TableCell>{String(request.tokenId)}</TableCell>
                     <TableCell>
                       <TextField
                         label="Your Suggested Price"
                         size="small"
                         variant="outlined"
+                        value={
+                          suggestPrice.get(request.id)
+                            ? suggestPrice.get(request.id)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const nMa = new Map(suggestPrice);
+                          nMa.set(request.id, e.target.value);
+                          setSuggestPrice(nMa);
+                        }}
                       />
                     </TableCell>
                     <TableCell>
-                      <Button variant="contained" color="secondary" size="small">
+                      <Button
+                        variant="contained"
+                        color="secondary"
+                        size="small"
+                        disabled={!suggestPrice.get(request.id)}
+                        onClick={async () => {
+                          const tx = await priceFinder.priceAsset(
+                            request.id,
+                            suggestPrice.get(request.id)
+                          );
+                          const isTransactionMined = async (
+                            transactionHash
+                          ) => {
+                            const txReceipt =
+                              await connection.provider.getTransactionReceipt(
+                                transactionHash
+                              );
+                            if (txReceipt && txReceipt.blockNumber) {
+                              return txReceipt;
+                            }
+                          };
+
+                          const a = setInterval(() => {
+                            if (isTransactionMined(tx.hash)) {
+                              setTimeout(() => {
+                                mainDataFetching();
+
+                                const nMa = new Map(suggestPrice);
+                                nMa.set(request.id, "");
+                                setSuggestPrice(nMa);
+                              }, 3 * 1000);
+                              clearInterval(a);
+                            }
+                          }, 2000);
+                        }}
+                      >
                         Submit
                       </Button>
                     </TableCell>
